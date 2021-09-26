@@ -69,7 +69,11 @@ public class AudioOrb : MonoBehaviour
 	private void UpdateColour()
 	{
 		float currentDistance = Vector3.Distance(transform.position, player.position);
-		colour.a = Mathf.Lerp(maxAlpha, minAlpha, currentDistance / maxFadeDistance);
+
+		if ( !Active )
+			colour.a = Mathf.Lerp(maxAlpha, minAlpha, currentDistance / maxFadeDistance);
+		else
+			colour.a = Mathf.Lerp(maxAlpha / 2f, minAlpha / 2f, currentDistance / maxFadeDistance);
 
 		// update the orbs colour.
 		mat = GetComponent<Renderer>().material;
