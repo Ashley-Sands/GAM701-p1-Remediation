@@ -26,7 +26,7 @@ public class AudioOrb : MonoBehaviour
 
 	const int samplesPerSecond  = 44100;
 	const int loopOverlapLength = 3375;	    // samples
-	const float minSyncTime     = 1.5f;	    // seconds
+	const float minSyncTime     = 1f;	    // seconds
 
 	public AudioClip[] clips;
 	private AudioSource[] audioSources; // for simplisity we just use 1 AudioSource per clip.
@@ -78,9 +78,11 @@ public class AudioOrb : MonoBehaviour
 		float newSize = 0;
 
 		if (paulseTime < HalfPaulseLength)
-			newSize = Mathf.Lerp(paulseMinSize, paulseMaxSize, paulseTime);
+			newSize = Mathf.Lerp(paulseMinSize, paulseMaxSize, paulseTime / HalfPaulseLength);
 		else
-			newSize = Mathf.Lerp(paulseMaxSize, paulseMinSize, paulseTime - HalfPaulseLength);
+			newSize = Mathf.Lerp(paulseMaxSize, paulseMinSize, (paulseTime - HalfPaulseLength) / HalfPaulseLength);
+
+		print($" {paulseTime} # {paulseTime - HalfPaulseLength} ");
 
 		transform.localScale = new Vector3( newSize, newSize, newSize );
 
@@ -148,7 +150,7 @@ public class AudioOrb : MonoBehaviour
 		AudioSource transitionSource = currentAudioSource;
 
 		float remainingTime = transitionSource.clip.length - transitionSource.time;
-		float transitionLength = transitionSource.clip.length * 0.05f;
+		float transitionLength = minSyncTime;// transitionSource.clip.length * 0.05f;
 
 		// wait for the transition start position.
 		while (remainingTime > transitionLength)
@@ -156,7 +158,6 @@ public class AudioOrb : MonoBehaviour
 			yield return new WaitForEndOfFrame();
 
 			remainingTime = transitionSource.clip.length - transitionSource.time;
-			transitionLength = transitionSource.clip.length * 0.05f;
 
 		}
 
@@ -167,7 +168,6 @@ public class AudioOrb : MonoBehaviour
 			yield return new WaitForEndOfFrame();
 
 			remainingTime = transitionSource.clip.length - transitionSource.time;
-			transitionLength = transitionSource.clip.length * 0.05f;
 
 			transitionSource.pitch = remainingTime / transitionLength;
 			transitionSource.volume = remainingTime / transitionLength;
@@ -214,7 +214,7 @@ public class AudioOrb : MonoBehaviour
 		if ( !Active )
 			colour.a = Mathf.Lerp(maxAlpha, minAlpha, currentDistance / maxFadeDistance);
 		else
-			colour.a = Mathf.Lerp(maxAlpha / 2f, minAlpha / 2f, currentDistance / maxFadeDistance);
+			colour.a = Mathf.Lerp(minAlpha / 4f, 0f, currentDistance / maxFadeDistance);
 
 		// update the orbs colour.
 		mat = GetComponent<Renderer>().material;
