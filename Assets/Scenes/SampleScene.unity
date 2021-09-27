@@ -2482,7 +2482,7 @@ PrefabInstance:
       objectReference: {fileID: 0}
     - target: {fileID: 8480934166823230931, guid: 8dbcf66ce9cf73a4ba6d7ddad83c24eb, type: 3}
       propertyPath: loopingID
-      value: 1
+      value: 0
       objectReference: {fileID: 0}
     - target: {fileID: 8480934166823230931, guid: 8dbcf66ce9cf73a4ba6d7ddad83c24eb, type: 3}
       propertyPath: orbManager
