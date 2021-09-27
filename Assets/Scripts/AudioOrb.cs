@@ -7,6 +7,7 @@ public class AudioOrb : MonoBehaviour
 
 	public bool Active => orbManager != null ? orbManager.OrbIsActive(this) : false;
 
+	public bool playOnStart = false;	// this should only be true on a single orb.
     public Color colour = new Color(0, 0, 1f, 0.25f);
 
 	public float maxFadeDistance = 10;
@@ -23,13 +24,15 @@ public class AudioOrb : MonoBehaviour
 
 	public OrbManager orbManager;
 
-	const int samplesPerSecond = 44100;
-	const float minSyncTime = 1.5f;	// seconds
+	const int samplesPerSecond  = 44100;
+	const int loopOverlapLength = 3375;	    // samples
+	const float minSyncTime     = 1.5f;	    // seconds
 
 	public AudioClip[] clips;
 	private AudioSource[] audioSources; // for simplisity we just use 1 AudioSource per clip.
 	public AudioSource currentAudioSource => Active ? audioSources[currentID] : null;
 	private int currentID = 0;
+	public int loopingID = 0;
 
 	private Material mat;
 
@@ -61,6 +64,9 @@ public class AudioOrb : MonoBehaviour
 
 		}
 
+		if (playOnStart)
+			orbManager.TriggerOrb( this );
+
 	}
 
 	public void Update()
@@ -89,15 +95,90 @@ public class AudioOrb : MonoBehaviour
 
 	}
 
-	public void ActivateOrb( int startClipID, AudioSource currentAudioSource )
+	public void ActivateOrb( AudioOrb currentOrb ) //int startClipID, AudioSource currentAudioSource )
 	{
-		currentID = startClipID;
 
-		int currentSample = currentAudioSource.timeSamples;
-		double remainingTimeSec = (double)(currentAudioSource.clip.samples - currentSample) / (double)samplesPerSecond;
+		// if no current audio source is passed in, no source is currently playing
+		// therefor we can just start playing the clip.
+		if (currentOrb == null)
+		{
+			audioSources[currentID].Play();
+			return;
+		}
+
+		AudioSource orbAS = currentOrb.currentAudioSource;
+		int orbCID        = currentOrb.currentID;
+
+		//TODO: we need to prevent the posiblity of a clip starting if there is less than the min sync time remaining.
+
+		currentID = orbCID+1 < clips.Length ? orbCID + 1 : loopingID;
+
+		int currentSample       = orbAS.timeSamples;
+		double remainingTimeSec = (double)(orbAS.clip.samples - currentSample) / (double)samplesPerSecond;
+
+		double dspStartTime = AudioSettings.dspTime + remainingTimeSec;
 
 		// cue the audio to start playing 
-		audioSources[currentID].PlayScheduled(AudioSettings.dspTime + remainingTimeSec);
+		audioSources[currentID].PlayScheduled( dspStartTime );
+
+		StartCoroutine( TransitionOrbIn( dspStartTime ) );
+
+	}
+
+	private IEnumerator TransitionOrbIn( double dspStart )
+	{
+		while (dspStart < AudioSettings.dspTime)
+			yield return new WaitForEndOfFrame();
+
+		orbManager.ForceLastOrbStop();
+
+	}
+
+	public void TransitionOrbOut( )
+	{
+		// Trasision any audio clips out so its not so jaring when the genra changes.
+
+		StartCoroutine( TransitionOut() );
+
+	}
+
+	private IEnumerator TransitionOut( )
+	{
+
+		AudioSource transitionSource = currentAudioSource;
+
+		float remainingTime = transitionSource.clip.length - transitionSource.time;
+		float transitionLength = transitionSource.clip.length * 0.05f;
+
+		// wait for the transition start position.
+		while (remainingTime > transitionLength)
+		{
+			yield return new WaitForEndOfFrame();
+
+			remainingTime = transitionSource.clip.length - transitionSource.time;
+			transitionLength = transitionSource.clip.length * 0.05f;
+
+		}
+
+		// do transition
+		while (transitionSource.isPlaying )
+		{
+
+			yield return new WaitForEndOfFrame();
+
+			remainingTime = transitionSource.clip.length - transitionSource.time;
+			transitionLength = transitionSource.clip.length * 0.05f;
+
+			transitionSource.pitch = remainingTime / transitionLength;
+			transitionSource.volume = remainingTime / transitionLength;
+
+			print($"{remainingTime} / {transitionLength} = {remainingTime / transitionLength}");
+
+		}
+
+		// now the audio has stop we must put the pitch and vol back to the default value.
+		transitionSource.pitch = 1f;
+		transitionSource.volume = 1f;
 
 	}
 
@@ -107,7 +188,9 @@ public class AudioOrb : MonoBehaviour
 		if (!Active) return;
 
 		int currentSample = audioSources[ currentID ].timeSamples;
-		double remainingTimeSec = (double)(clips[currentID].samples - currentSample) / (double)samplesPerSecond;
+		//start the next loop aprox 0.05 seconds erly
+		//to help prevent any slight glitches between tracks.
+		double remainingTimeSec = (double)(clips[currentID].samples - currentSample - loopOverlapLength) / (double)samplesPerSecond;	
 
 		if ( remainingTimeSec < minSyncTime )
 		{
@@ -116,7 +199,7 @@ public class AudioOrb : MonoBehaviour
 			currentID++;
 
 			if ( currentID >= clips.Length )
-				currentID = 0;
+				currentID = loopingID;
 
 			audioSources[ currentID ].PlayScheduled( AudioSettings.dspTime + remainingTimeSec);
 
@@ -136,6 +219,19 @@ public class AudioOrb : MonoBehaviour
 		// update the orbs colour.
 		mat = GetComponent<Renderer>().material;
 		mat.SetColor("_Color", colour);
+	}
+
+	public void ForceStop()
+	{
+		// force stop all audio sources.
+		foreach ( AudioSource source in audioSources )
+		{
+			source.Stop();
+
+			source.time = 0;
+			source.pitch = 1f;
+			source.volume = 1f;
+		}
 	}
 
 	public void OnTriggerEnter(Collider other)
