@@ -11,8 +11,9 @@ public class OrbManager : MonoBehaviour
         // Only trigger the orb if it is not active.
         if ( orb != activeOrb )
         {
-            //...
+            // Sync this current id with next id on the new orb.
 
+            
             activeOrb = orb;
 		}
 

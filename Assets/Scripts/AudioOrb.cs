@@ -21,8 +21,15 @@ public class AudioOrb : MonoBehaviour
     public float paulseMinSize = 0.75f;
     public float paulseMaxSize = 1.25f;
 
-	public AudioSource audioSource;
 	public OrbManager orbManager;
+
+	const int samplesPerSecond = 44100;
+	const float minSyncTime = 1.5f;	// seconds
+
+	public AudioClip[] clips;
+	private AudioSource[] audioSources; // for simplisity we just use 1 AudioSource per clip.
+	public AudioSource currentAudioSource => Active ? audioSources[currentID] : null;
+	private int currentID = 0;
 
 	private Material mat;
 
@@ -37,7 +44,22 @@ public class AudioOrb : MonoBehaviour
 		player = GameObject.FindGameObjectWithTag("Player").transform;
 
 		UpdateColour();
-		
+
+		// Spwan the Audio Sources for each audio clip
+
+		audioSources = new AudioSource[clips.Length];
+
+		for ( int i = 0; i < clips.Length; i++ )
+		{
+
+			AudioSource newSource = gameObject.AddComponent<AudioSource>();
+			newSource.clip = clips[i];
+			newSource.loop = false;
+			newSource.playOnAwake = false;
+
+			audioSources[i] = newSource;
+
+		}
 
 	}
 
@@ -57,12 +79,48 @@ public class AudioOrb : MonoBehaviour
 		transform.localScale = new Vector3( newSize, newSize, newSize );
 
 		UpdateColour();
+		UpdateAudio();
 
 		// update time at the end to make sure its correct on the first tick.
 		paulseTime += Time.deltaTime;
 
 		if (paulseTime >= paulseLength)
 			paulseTime -= paulseLength;
+
+	}
+
+	public void ActivateOrb( int startClipID, AudioSource currentAudioSource )
+	{
+		currentID = startClipID;
+
+		int currentSample = currentAudioSource.timeSamples;
+		double remainingTimeSec = (double)(currentAudioSource.clip.samples - currentSample) / (double)samplesPerSecond;
+
+		// cue the audio to start playing 
+		audioSources[currentID].PlayScheduled(AudioSettings.dspTime + remainingTimeSec);
+
+	}
+
+	private void UpdateAudio()
+	{
+		
+		if (!Active) return;
+
+		int currentSample = audioSources[ currentID ].timeSamples;
+		double remainingTimeSec = (double)(clips[currentID].samples - currentSample) / (double)samplesPerSecond;
+
+		if ( remainingTimeSec < minSyncTime )
+		{
+			
+			// queue the next audio source.
+			currentID++;
+
+			if ( currentID >= clips.Length )
+				currentID = 0;
+
+			audioSources[ currentID ].PlayScheduled( AudioSettings.dspTime + remainingTimeSec);
+
+		}
 
 	}
 
